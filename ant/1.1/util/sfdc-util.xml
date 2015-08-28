@@ -1596,7 +1596,7 @@ ${sfdc-util.SF-JAR.PATH}
 			<rh-util:ifFileExists file="${selective-pull.ZIP_FILE}">
 				<rh-util:then>
 					<unzip src="${selective-pull.ZIP_FILE}" dest="${selective-pull.DIR}"/>
-                    <rh-sfdc:transformFiles srcDir="${selective-pull.DIR}" xslDir="@{xslDir}"/>
+                    <rh-sfdc:transformFiles srcDir="${selective-pull.DIR}" xslDir="@{xslDir}" solenopsisXslDir="${solenopsis.xsl.HOME}"/>
 				</rh-util:then>
 
 				<rh-util:else>
@@ -1947,7 +1947,7 @@ ${sfdc-util.SF-JAR.PATH}
 
 			<unzip src="${folder-pull.ZIP_FILE}" dest="${folder-pull.DIR}"/>
 
-            <rh-sfdc:transformFiles srcDir="${folder-pull.DIR}" xslDir="@{xslDir}"/>
+            <rh-sfdc:transformFiles srcDir="${folder-pull.DIR}" xslDir="@{xslDir}" solenopsisXslDir="${solenopsis.xsl.HOME}"/>
 
             <rh-sfdc:purge-ignores-refs env="@{dependentEnv}"/>
 
@@ -1985,8 +1985,10 @@ ${sfdc-util.SF-JAR.PATH}
 
         <attribute name="srcDir"/>
         <attribute name="xslDir"/>
+        <attribute name="solenopsisXslDir"/>
 
 		<![CDATA[
+            import java.io.ByteArrayInputStream;
             import java.io.ByteArrayOutputStream;
 
             import java.util.List;
@@ -2128,7 +2130,7 @@ ${sfdc-util.SF-JAR.PATH}
             //
             // Transform a file.
             //
-            void transformFile(Transformer transformer, String xslDir, File xslFile, String srcDir) {
+            void transformFile3(Transformer transformer, String xslDir, File xslFile, String srcDir, Transformer solenopsisXslCopyTransformer) {
                 File srcFile = findFileToApply(computeBranch(xslFile, xslDir), srcDir);
 
                 if (! isFileFound(srcFile)) {
@@ -2136,6 +2138,8 @@ ${sfdc-util.SF-JAR.PATH}
                 }
 
                 System.out.println("Transforming [" + srcFile +"] using XSL [" + xslFile + "]");
+
+                // ----------------------------------------
 
                 StreamSource input = new StreamSource(srcFile);
 
@@ -2145,36 +2149,52 @@ ${sfdc-util.SF-JAR.PATH}
 
                 transformer.transform(input, output);
 
+                // ----------------------------------------
+
+                StreamSource copyInput = new StreamSource(new ByteArrayInputStream(baos.toByteArray()));
+
+                ByteArrayOutputStream copyBaos = new ByteArrayOutputStream();
+
+                StreamResult copyOutput = new StreamResult(copyBaos);
+
+                solenopsisXslCopyTransformer.transform(copyInput, copyOutput);
+
+                // ----------------------------------------
+
                 FileOutputStream fos = new FileOutputStream(srcFile);
-                fos.write(baos.toByteArray());
+
+                fos.write(copyBaos.toByteArray());
+
+                System.out.println("TRANSFORM\n" + new String(copyBaos.toByteArray()));
 
                 fos.close();
                 baos.close();
+                copyBaos.close();
             }
 
             //
             // Transform a file.
             //
-            void transformFile(String xslDir, File xslFile, String srcDir) {
-                return transformFile(TransformerFactory.newInstance().newTransformer(new StreamSource(xslFile)), xslDir, xslFile, srcDir);
+            void transformFile2(String xslDir, File xslFile, String srcDir, File solenopsisXslCopyFile) {
+                return transformFile3(TransformerFactory.newInstance().newTransformer(new StreamSource(xslFile)), xslDir, xslFile, srcDir, TransformerFactory.newInstance().newTransformer(new StreamSource(solenopsisXslCopyFile)));
             }
 
             //
             // Transform a file.
             //
-            void transformFile(String xslDir, String xslFile, String srcDir) {
-                return transformFile(xslDir, new File(xslFile), srcDir);
+            void transformFile1(String xslDir, File xslFile, String srcDir, String solenopsisXslDir) {
+                return transformFile2(xslDir, xslFile, srcDir, new File(solenopsisXslDir, "util/copy.xsl"));
             }
 
             //
             // Transform all files...
             //
-            void transformFiles(String xslDir, List xslFileList, String srcDir) {
+            void transformFiles(String xslDir, List xslFileList, String srcDir, String solenopsisXslDir) {
                 System.out.println("Total XSLs [" + xslFileList.size() + "]:");
                 System.out.println("    " + xslFileList);
 
                 for (File xslFile : xslFileList) {
-                    transformFile(xslDir, xslFile, srcDir);
+                    transformFile1(xslDir, xslFile, srcDir, solenopsisXslDir);
                 }
             }
 
@@ -2204,9 +2224,10 @@ ${sfdc-util.SF-JAR.PATH}
             }
 
             String xslDir = ensureNoTrailingSlash(attributes.get("xsldir"));
+            String solenopsisXslDir = ensureNoTrailingSlash(attributes.get("solenopsisxsldir"));
 
             if (isXslDir(xslDir)) {
-                transformFiles(xslDir, findAllXsls(xslDir), attributes.get("srcdir"));
+                transformFiles(xslDir, findAllXsls(xslDir), attributes.get("srcdir"), solenopsisXslDir);
             } else {
                 System.out.println("WARNING:  No xsl directory found for [" + xslDir + "]");
             }
@@ -2481,7 +2502,7 @@ ${sfdc-util.SF-JAR.PATH}
             <rh-util:find-value-in-files baseDir="${file-push.tmp.DIR}/classes"  key="(\s)*\*(\s)*@testClasses" valuesFound="file-push.TEST_CLASSES"/>
             <rh-util:find-value-in-files baseDir="${file-push.tmp.DIR}/triggers" key="(\s)*\*(\s)*@testClasses" valuesFound="file-push.TEST_TRIGGERS"/>
 
-            <rh-sfdc:transformFiles srcDir="${file-push.tmp.DIR}" xslDir="@{xslDir}"/>
+            <rh-sfdc:transformFiles srcDir="${file-push.tmp.DIR}" xslDir="@{xslDir}" solenopsisXslDir="${solenopsis.xsl.HOME}"/>
 
 			<!--
 				If an excludes file is passed in, use that for the zip task, otherwise,
@@ -3042,7 +3063,7 @@ ${sfdc-util.SF-JAR.PATH}
 
             <rh-sfdc:generateDeployXml dir="${push.tmp.DIR}" antJar="${sf.migrationToolJar}" apiVersion="${push.VERSION}" username="${push.USERNAME}" password="${push.PASSWORD}" serverurl="${push.URL}" zipFile ="${push.DEPLOY_FILE}" trace="@{trace}" runAllTests="@{runAllTests}" maxPoll="@{maxPoll}" allowMissingFiles="@{allowMissingFiles}" checkOnly="@{checkOnly}" logType="@{logType}" ignoreWarnings="@{ignoreWarnings}" dumpFiles="@{dumpFiles}" showPasswords="@{showPasswords}"/>
 
-            <rh-sfdc:transformFiles srcDir="${push.tmp.DIR}" xslDir="@{xslDir}"/>
+            <rh-sfdc:transformFiles srcDir="${push.tmp.DIR}" xslDir="@{xslDir}" solenopsisXslDir="${solenopsis.xsl.HOME}"/>
 
             <rh-util:ifEqual arg1="@{dryRun}" arg2="">
                 <rh-util:then>
