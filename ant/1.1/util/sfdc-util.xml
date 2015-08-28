@@ -2130,7 +2130,7 @@ ${sfdc-util.SF-JAR.PATH}
             //
             // Transform a file.
             //
-            void transformFile3(Transformer transformer, String xslDir, File xslFile, String srcDir, Transformer solenopsisXslCopyTransformer) {
+            void transformFile3(Transformer transformer, String xslDir, File xslFile, String srcDir, Transformer solenopsisXslCopyNoSpaceTransformer, Transformer solenopsisXslCopyAddSpaceTransformer) {
                 File srcFile = findFileToApply(computeBranch(xslFile, xslDir), srcDir);
 
                 if (! isFileFound(srcFile)) {
@@ -2151,39 +2151,53 @@ ${sfdc-util.SF-JAR.PATH}
 
                 // ----------------------------------------
 
-                StreamSource copyInput = new StreamSource(new ByteArrayInputStream(baos.toByteArray()));
+                StreamSource copyNoSpaceInput = new StreamSource(new ByteArrayInputStream(baos.toByteArray()));
 
-                ByteArrayOutputStream copyBaos = new ByteArrayOutputStream();
+                ByteArrayOutputStream copyNoSpaceBaos = new ByteArrayOutputStream();
 
-                StreamResult copyOutput = new StreamResult(copyBaos);
+                StreamResult copyNoSpaceOutput = new StreamResult(copyNoSpaceBaos);
 
-                solenopsisXslCopyTransformer.transform(copyInput, copyOutput);
+                solenopsisXslCopyNoSpaceTransformer.transform(copyNoSpaceInput, copyNoSpaceOutput);
+
+                // ----------------------------------------
+
+                StreamSource copyAddSpaceInput = new StreamSource(new ByteArrayInputStream(copyNoSpaceBaos.toByteArray()));
+
+                ByteArrayOutputStream copyAddSpaceBaos = new ByteArrayOutputStream();
+
+                StreamResult copyAddSpaceOutput = new StreamResult(copyAddSpaceBaos);
+
+                solenopsisXslCopyAddSpaceTransformer.transform(copyAddSpaceInput, copyAddSpaceOutput);
 
                 // ----------------------------------------
 
                 FileOutputStream fos = new FileOutputStream(srcFile);
 
-                fos.write(copyBaos.toByteArray());
+                fos.write(copyAddSpaceBaos.toByteArray());
 
-                System.out.println("TRANSFORM\n" + new String(copyBaos.toByteArray()));
+                System.out.println("TRANSFORM\n" + new String(copyNoSpaceBaos.toByteArray()));
+                //System.out.println("TRANSFORM\n" + new String(copyAddSpaceBaos.toByteArray()));
+
+                // ----------------------------------------
 
                 fos.close();
                 baos.close();
-                copyBaos.close();
+                copyNoSpaceBaos.close();
+                copyAddSpaceBaos.close();
             }
 
             //
             // Transform a file.
             //
-            void transformFile2(String xslDir, File xslFile, String srcDir, File solenopsisXslCopyFile) {
-                return transformFile3(TransformerFactory.newInstance().newTransformer(new StreamSource(xslFile)), xslDir, xslFile, srcDir, TransformerFactory.newInstance().newTransformer(new StreamSource(solenopsisXslCopyFile)));
+            void transformFile2(String xslDir, File xslFile, String srcDir, File solenopsisXslCopyNoSpaceFile, File solenopsisXslCopyAddSpaceFile) {
+                return transformFile3(TransformerFactory.newInstance().newTransformer(new StreamSource(xslFile)), xslDir, xslFile, srcDir, TransformerFactory.newInstance().newTransformer(new StreamSource(solenopsisXslCopyNoSpaceFile)), TransformerFactory.newInstance().newTransformer(new StreamSource(solenopsisXslCopyAddSpaceFile)));
             }
 
             //
             // Transform a file.
             //
             void transformFile1(String xslDir, File xslFile, String srcDir, String solenopsisXslDir) {
-                return transformFile2(xslDir, xslFile, srcDir, new File(solenopsisXslDir, "util/copy.xsl"));
+                return transformFile2(xslDir, xslFile, srcDir, new File(solenopsisXslDir, "util/copyNoSpace.xsl"), new File(solenopsisXslDir, "util/copyAddSpace.xsl"));
             }
 
             //
